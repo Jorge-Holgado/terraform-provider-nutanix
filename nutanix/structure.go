@@ -5,13 +5,15 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	v3 "github.com/terraform-providers/terraform-provider-nutanix/client/v3"
-	"github.com/terraform-providers/terraform-provider-nutanix/utils"
+	v3 "github.com/Jorge-Holgado/terraform-provider-nutanix/client/v3"
+	"github.com/Jorge-Holgado/terraform-provider-nutanix/utils"
 )
 
 const (
 	// CDROM ...
 	CDROM = "CDROM"
+	// IDE :-p
+	IDE = "IDE"
 )
 
 func expandStringList(configured []interface{}) []*string {
@@ -104,9 +106,14 @@ func flattenNicList(nics []*v3.VMNic) []map[string]interface{} {
 
 func flattenDiskList(disks []*v3.VMDisk) []map[string]interface{} {
 	diskList := make([]map[string]interface{}, 0)
+	diskListV2 := make([]map[string]interface{}, 0)
+	upperValue := 0
 	if disks != nil {
 		diskList = make([]map[string]interface{}, len(disks))
 		for k, v := range disks {
+			if utils.StringValue(v.DeviceProperties.DiskAddress.AdapterType) == IDE && utils.StringValue(v.DeviceProperties.DeviceType) == CDROM {
+				continue
+			}
 			disk := make(map[string]interface{})
 
 			disk["uuid"] = utils.StringValue(v.UUID)
@@ -132,10 +139,18 @@ func flattenDiskList(disks []*v3.VMDisk) []map[string]interface{} {
 			disk["data_source_reference"] = flattenReferenceValues(v.DataSourceReference)
 			disk["volume_group_reference"] = flattenReferenceValues(v.VolumeGroupReference)
 
+			upperValue += 1
 			diskList[k] = disk
 		}
 	}
-	return diskList
+
+	if upperValue < len(disks) {
+		diskListV2 = make([]map[string]interface{}, upperValue)
+		for i := range diskListV2 {
+			diskListV2[i] = diskList[i]
+		}
+	}
+	return diskListV2
 }
 
 func flattenSerialPortList(serialPorts []*v3.VMSerialPort) []map[string]interface{} {
